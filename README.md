@@ -19,6 +19,8 @@ http://www.slideshare.net/JeffJirsa1/cassandra-summit-2015-real-world-dtcs-for-o
 Source
 ------
 
+This repository ( https://github.com/jeffjirsa/twcs ) will be used for standalone TWCS code (simple jar to drop into lib/). 
+
 For now, TWCS is available as a C* fork (in the hopes that patches are accepted upstream):
 
 2.1: https://github.com/jeffjirsa/cassandra/tree/twcs-2.1

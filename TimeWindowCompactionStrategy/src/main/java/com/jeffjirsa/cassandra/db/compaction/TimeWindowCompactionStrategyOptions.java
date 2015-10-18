@@ -23,8 +23,8 @@ import com.google.common.collect.ImmutableList;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.cassandra.db.compaction.*; 
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.db.compaction.*;
 
 public final class TimeWindowCompactionStrategyOptions
 {
@@ -47,6 +47,7 @@ public final class TimeWindowCompactionStrategyOptions
 
     protected final static ImmutableList<TimeUnit> validTimestampTimeUnits = ImmutableList.of(TimeUnit.SECONDS, TimeUnit.MILLISECONDS, TimeUnit.MICROSECONDS, TimeUnit.NANOSECONDS);
     protected final static ImmutableList<TimeUnit> validWindowTimeUnits = ImmutableList.of(TimeUnit.MINUTES, TimeUnit.HOURS, TimeUnit.DAYS);
+
 
     public TimeWindowCompactionStrategyOptions(Map<String, String> options)
     {

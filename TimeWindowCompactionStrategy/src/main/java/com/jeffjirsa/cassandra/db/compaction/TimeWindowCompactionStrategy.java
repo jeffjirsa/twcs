@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +35,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import org.apache.cassandra.dht.Range;
+import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.io.sstable.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,6 +117,7 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
         Set<SSTableReader> candidates = Sets.newHashSet(filterSuspectSSTables(uncompacting));
 
         List<SSTableReader> compactionCandidates = new ArrayList<SSTableReader>(getNextNonExpiredSSTables(Sets.difference(candidates, expired), gcBefore));
+
         if (!expired.isEmpty())
         {
             logger.debug("Including expired sstables: {}", expired);
@@ -123,6 +129,17 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
 
     private List<SSTableReader> getNextNonExpiredSSTables(Iterable<SSTableReader> nonExpiringSSTables, final int gcBefore)
     {
+        /*
+         * Not all SSTables have TTLs that drop around the same time. In some cases there are tables that have 99% of records that
+         * drop at the same time and 1% that will live significantly longer. These SSTables tend to get starved for compaction and end up
+         * sitting round taking up more space than the system can handle. This first check prioritizes files with very high tombstone ratios
+         * so that we don't eat up all the disk on a machine.
+         */
+        SSTableReader sstablesWithMaxTombstoneRatio = getHigestMaxedOutTombstoneRatioSstable(nonExpiringSSTables, gcBefore);
+
+        if (sstablesWithMaxTombstoneRatio != null) return Collections.singletonList(sstablesWithMaxTombstoneRatio);
+
+        // Now check for the most interesting tables.
         List<SSTableReader> mostInteresting = getCompactionCandidates(nonExpiringSSTables);
 
         if (mostInteresting != null)
@@ -141,7 +158,33 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
         if (sstablesWithTombstones.isEmpty())
             return Collections.emptyList();
 
-        return Collections.singletonList(Collections.min(sstablesWithTombstones, new SSTableReader.SizeComparator()));
+        // Compact the tables with the highest tombstone ratios first.
+        return Collections.singletonList(Collections.max(sstablesWithTombstones, (o1, o2) ->
+                Double.compare(o1.getEstimatedDroppableTombstoneRatio(gcBefore), o2.getEstimatedDroppableTombstoneRatio(gcBefore))));
+    }
+
+    /***
+     * @param nonExpiringSSTables
+     * @param gcBefore
+     * @return The SSTableReader with the highest tombstone ratio that is above the threashold
+     */
+    private SSTableReader getHigestMaxedOutTombstoneRatioSstable(Iterable<SSTableReader> nonExpiringSSTables, final int gcBefore)
+    {
+        List<SSTableReader> sstablesWithMaxTombstoneRatio = Lists.newArrayList();
+
+        for (SSTableReader sstable : nonExpiringSSTables)
+        {
+            if (reachedMaxTombstonesRatio(sstable, gcBefore))
+                sstablesWithMaxTombstoneRatio.add(sstable);
+        }
+
+        if(sstablesWithMaxTombstoneRatio.size() > 0)
+        {
+            return Collections.max(sstablesWithMaxTombstoneRatio, (o1, o2) ->
+                    Double.compare(o1.getEstimatedDroppableTombstoneRatio(gcBefore), o2.getEstimatedDroppableTombstoneRatio(gcBefore)));
+        }
+
+        return null;
     }
 
     private List<SSTableReader> getCompactionCandidates(Iterable<SSTableReader> candidateSSTables)
@@ -389,4 +432,65 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
                 cfs.getMinimumCompactionThreshold(),
                 cfs.getMaximumCompactionThreshold());
     }
+
+    /**
+     * Check if given sstable is worth dropping tombstones at gcBefore.
+     * Check is skipped if tombstone_compaction_interval time does not elapse since sstable creation and returns false.
+     *
+     * @param sstable SSTable to check
+     * @param gcBefore time to drop tombstones
+     * @return true if given sstable's tombstones are expected to be removed
+     */
+    protected boolean reachedMaxTombstonesRatio(SSTableReader sstable, int gcBefore)
+    {
+        if (disableTombstoneCompactions)
+            return false;
+        // since we use estimations to calculate, there is a chance that compaction will not drop tombstones actually.
+        // if that happens we will end up in infinite compaction loop, so first we check enough if enough time has
+        // elapsed since SSTable created.
+        if (System.currentTimeMillis() < sstable.getCreationTimeFor(Component.DATA) + tombstoneCompactionInterval * 1000)
+            return false;
+
+        double droppableRatio = sstable.getEstimatedDroppableTombstoneRatio(gcBefore);
+
+        if (droppableRatio <= options.tombstoneMaxRatio)
+            return false;
+
+        //sstable range overlap check is disabled. See CASSANDRA-6563.
+        if (uncheckedTombstoneCompaction)
+            return true;
+
+        Collection<SSTableReader> overlaps = cfs.getOverlappingSSTables(Collections.singleton(sstable));
+        if (overlaps.isEmpty())
+        {
+            // there is no overlap, tombstones are safely droppable
+            return true;
+        }
+        else if (CompactionController.getFullyExpiredSSTables(cfs, Collections.singleton(sstable), overlaps, gcBefore).size() > 0)
+        {
+            return true;
+        }
+        else
+        {
+            // what percentage of columns do we expect to compact outside of overlap?
+            if (sstable.getIndexSummarySize() < 2)
+            {
+                // we have too few samples to estimate correct percentage
+                return false;
+            }
+            // first, calculate estimated keys that do not overlap
+            long keys = sstable.estimatedKeys();
+            Set<Range<Token>> ranges = new HashSet<Range<Token>>(overlaps.size());
+            for (SSTableReader overlap : overlaps)
+                ranges.add(new Range<Token>(overlap.first.getToken(), overlap.last.getToken(), overlap.partitioner));
+            long remainingKeys = keys - sstable.estimatedKeysForRanges(ranges);
+            // next, calculate what percentage of columns we have within those keys
+            long columns = sstable.getEstimatedColumnCount().mean() * remainingKeys;
+            double remainingColumnsRatio = ((double) columns) / (sstable.getEstimatedColumnCount().count() * sstable.getEstimatedColumnCount().mean());
+
+            // return if we still expect to have droppable tombstones in rest of columns
+            return remainingColumnsRatio * droppableRatio > tombstoneThreshold;
+        }
+    }
+
 }

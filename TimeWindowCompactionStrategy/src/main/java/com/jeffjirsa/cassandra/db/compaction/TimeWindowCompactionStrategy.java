@@ -138,7 +138,7 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
         }
 
         // If there are files that could be compacted because they reached their tombstone ratio, then clean them up.
-        // NOTE: You should set a high tombstone ratio so you're not constantly compacting SSTables.
+        // NOTE: You should set a the tombstone ratio and tombstone compaction interval high enough so you're not constantly compacting SSTables.
         if(!sstablesWithTombstones.isEmpty())
         {
             // Compact the tables with the highest tombstone ratios first.

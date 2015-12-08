@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +35,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import org.apache.cassandra.dht.Range;
+import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.io.sstable.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,6 +117,7 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
         Set<SSTableReader> candidates = Sets.newHashSet(filterSuspectSSTables(uncompacting));
 
         List<SSTableReader> compactionCandidates = new ArrayList<SSTableReader>(getNextNonExpiredSSTables(Sets.difference(candidates, expired), gcBefore));
+
         if (!expired.isEmpty())
         {
             logger.debug("Including expired sstables: {}", expired);
@@ -123,25 +129,34 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
 
     private List<SSTableReader> getNextNonExpiredSSTables(Iterable<SSTableReader> nonExpiringSSTables, final int gcBefore)
     {
-        List<SSTableReader> mostInteresting = getCompactionCandidates(nonExpiringSSTables);
-
-        if (mostInteresting != null)
-        {
-            return mostInteresting;
-        }
-
-        // if there is no sstable to compact in standard way, try compacting single sstable whose droppable tombstone
-        // ratio is greater than threshold.
+        // First get the a list of tables that could drop tombstones.
         List<SSTableReader> sstablesWithTombstones = new ArrayList<>();
         for (SSTableReader sstable : nonExpiringSSTables)
         {
             if (worthDroppingTombstones(sstable, gcBefore))
                 sstablesWithTombstones.add(sstable);
         }
-        if (sstablesWithTombstones.isEmpty())
-            return Collections.emptyList();
 
-        return Collections.singletonList(Collections.min(sstablesWithTombstones, new SSTableReader.SizeComparator()));
+        // If there are files that could be compacted because they reached their tombstone ratio, then clean them up.
+        // NOTE: You should set a high tombstone ratio so you're not constantly compacting SSTables.
+        if(!sstablesWithTombstones.isEmpty())
+        {
+            // Compact the tables with the highest tombstone ratios first.
+            return Collections.singletonList(Collections.max(sstablesWithTombstones, (o1, o2) ->
+                    Double.compare(o1.getEstimatedDroppableTombstoneRatio(gcBefore), o2.getEstimatedDroppableTombstoneRatio(gcBefore))));
+        }
+
+        // Now check for the most interesting tables.
+        List<SSTableReader> mostInteresting = getCompactionCandidates(nonExpiringSSTables);
+
+        if (mostInteresting != null)
+        {
+            return mostInteresting;
+        }
+        else
+        {
+            return Collections.emptyList();
+        }
     }
 
     private List<SSTableReader> getCompactionCandidates(Iterable<SSTableReader> candidateSSTables)

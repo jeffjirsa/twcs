@@ -84,7 +84,7 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
                 return null;
 
             if (cfs.getDataTracker().markCompacting(latestBucket))
-                return new CompactionTask(cfs, latestBucket, gcBefore, false);
+                return new CompactionTask(cfs, latestBucket, gcBefore);
         }
     }
 
@@ -157,18 +157,6 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
         if (!mostInteresting.isEmpty())
             return mostInteresting;
         return null;
-    }
-
-    @Override
-    public void addSSTable(SSTableReader sstable)
-    {
-        sstables.add(sstable);
-    }
-
-    @Override
-    public void removeSSTable(SSTableReader sstable)
-    {
-        sstables.remove(sstable);
     }
 
     /**
@@ -338,13 +326,13 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
     }
 
     @Override
-    public synchronized Collection<AbstractCompactionTask> getMaximalTask(int gcBefore)
+    public synchronized AbstractCompactionTask getMaximalTask(int gcBefore)
     {
         Iterable<SSTableReader> sstables = cfs.markAllCompacting();
         if (sstables == null)
             return null;
 
-        return Arrays.<AbstractCompactionTask>asList(new CompactionTask(cfs, sstables, gcBefore, false));
+        return new CompactionTask(cfs, sstables, gcBefore);
     }
 
     @Override
@@ -358,7 +346,7 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
             return null;
         }
 
-        return new CompactionTask(cfs, sstables, gcBefore, false).setUserDefined(true);
+        return new CompactionTask(cfs, sstables, gcBefore).setUserDefined(true);
     }
 
     public int getEstimatedRemainingTasks()

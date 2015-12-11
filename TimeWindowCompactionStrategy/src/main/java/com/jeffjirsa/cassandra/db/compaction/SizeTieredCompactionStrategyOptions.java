@@ -20,22 +20,22 @@ package com.jeffjirsa.cassandra.db.compaction;
 import java.util.Map;
 
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.db.compaction.*;
 
 public final class SizeTieredCompactionStrategyOptions
 {
     protected static final long DEFAULT_MIN_SSTABLE_SIZE = 50L * 1024L * 1024L;
     protected static final double DEFAULT_BUCKET_LOW = 0.5;
     protected static final double DEFAULT_BUCKET_HIGH = 1.5;
+    protected static final double DEFAULT_COLD_READS_TO_OMIT = 0.0;
     protected static final String MIN_SSTABLE_SIZE_KEY = "min_sstable_size";
     protected static final String BUCKET_LOW_KEY = "bucket_low";
     protected static final String BUCKET_HIGH_KEY = "bucket_high";
-    @Deprecated
     protected static final String COLD_READS_TO_OMIT_KEY = "cold_reads_to_omit";
 
     protected long minSSTableSize;
     protected double bucketLow;
     protected double bucketHigh;
+    protected double coldReadsToOmit;
 
     public SizeTieredCompactionStrategyOptions(Map<String, String> options)
     {
@@ -45,6 +45,8 @@ public final class SizeTieredCompactionStrategyOptions
         bucketLow = optionValue == null ? DEFAULT_BUCKET_LOW : Double.parseDouble(optionValue);
         optionValue = options.get(BUCKET_HIGH_KEY);
         bucketHigh = optionValue == null ? DEFAULT_BUCKET_HIGH : Double.parseDouble(optionValue);
+        optionValue = options.get(COLD_READS_TO_OMIT_KEY);
+        coldReadsToOmit = optionValue == null ? DEFAULT_COLD_READS_TO_OMIT : Double.parseDouble(optionValue);
     }
 
     public SizeTieredCompactionStrategyOptions()
@@ -52,6 +54,7 @@ public final class SizeTieredCompactionStrategyOptions
         minSSTableSize = DEFAULT_MIN_SSTABLE_SIZE;
         bucketLow = DEFAULT_BUCKET_LOW;
         bucketHigh = DEFAULT_BUCKET_HIGH;
+        coldReadsToOmit = DEFAULT_COLD_READS_TO_OMIT;
     }
 
     private static double parseDouble(Map<String, String> options, String key, double defaultValue) throws ConfigurationException
@@ -88,7 +91,14 @@ public final class SizeTieredCompactionStrategyOptions
         if (bucketHigh <= bucketLow)
         {
             throw new ConfigurationException(String.format("%s value (%s) is less than or equal to the %s value (%s)",
-                                                           BUCKET_HIGH_KEY, bucketHigh, BUCKET_LOW_KEY, bucketLow));
+                    BUCKET_HIGH_KEY, bucketHigh, BUCKET_LOW_KEY, bucketLow));
+        }
+
+        double maxColdReadsRatio = parseDouble(options, COLD_READS_TO_OMIT_KEY, DEFAULT_COLD_READS_TO_OMIT);
+        if (maxColdReadsRatio < 0.0 || maxColdReadsRatio > 1.0)
+        {
+            throw new ConfigurationException(String.format("%s value (%s) should be between between 0.0 and 1.0",
+                    COLD_READS_TO_OMIT_KEY, optionValue));
         }
 
         uncheckedOptions.remove(MIN_SSTABLE_SIZE_KEY);

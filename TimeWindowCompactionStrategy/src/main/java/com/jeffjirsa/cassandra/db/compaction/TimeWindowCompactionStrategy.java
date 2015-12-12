@@ -106,6 +106,7 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
         {
             // Find fully expired SSTables. Those will be included no matter what.
             expired = CompactionController.getFullyExpiredSSTables(cfs, uncompacting, cfs.getOverlappingSSTables(uncompacting), gcBefore);
+            logger.debug("Checked for fully expired sstables, result: {}", expired);
             lastExpiredCheck = System.currentTimeMillis();
         }
 

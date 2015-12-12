@@ -98,7 +98,7 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
         if (!isEnabled() || cfs.getSSTables().isEmpty())
             return Collections.emptyList();
 
-        Set<SSTableReader> uncompacting = Sets.intersection(sstables, cfs.getUncompactingSSTables());
+        Set<SSTableReader> uncompacting = cfs.getUncompactingSSTables();
 
         Set<SSTableReader> expired = Collections.emptySet();
 

@@ -45,9 +45,10 @@ Enabling
 
 Use the `WITH compaction=` directive to set the compaction strategy.  By default, TWCS creates 1 Day buckets and assumes MICROSECOND resolution.
 
-Use `compaction_window_unit` of MINUTES, HOURS, or DAYS and `compaction_window_size` as an integer to group sstable into buckets of a fixed size that matches your use case.  
+Use `compaction_window_unit` of MINUTES, HOURS, or DAYS and `compaction_window_size` as an integer to group sstables into buckets of a fixed size that matches your use case.  
 Use `timestamp_resolution` to let the compaction strategy know which time unit to use.
 
+To create 3 minute buckets of microsecond resolution (for example, for data with very short TTL), you would use:
 
     CREATE TABLE twcs (
     id int,
@@ -59,6 +60,8 @@ Use `timestamp_resolution` to let the compaction strategy know which time unit t
         'class':'com.jeffjirsa.cassandra.db.compaction.TimeWindowCompactionStrategy'
         };
 
+You should target fewer than 50 buckets per table based on your TTL. A TTL of 90 days may want 3 day buckets, where a TTL of 2 hours may want 5 minute buckets.
+ 
 
 Source
 ------

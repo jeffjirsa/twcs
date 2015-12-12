@@ -1,7 +1,7 @@
 
 
 TWCS: Time Window Compaction Strategy
--------------------------------------
+==================================
 
 
 Motivation
@@ -38,13 +38,32 @@ mvn compile
 mvn package
 ```
 
-The resulting jar will be placed in target/
+The resulting jar will be placed in target/, copy it to the classpath of your cassandra server.
+
+Enabling
+----------
+
+Use the `WITH compaction=` directive to set the compaction strategy.  By default, TWCS creates 1 Day buckets and assumes MICROSECOND resolution.
+
+Use `compaction_window_unit` of MINUTES, HOURS, or DAYS and `compaction_window_size` as an integer to group sstable into buckets of a fixed size that matches your use case.  
+Use `timestamp_resolution` to let the compaction strategy know which time unit to use.
+
+
+    CREATE TABLE twcs (
+    id int,
+    value int,
+    PRIMARY KEY ((id))
+    ) WITH compaction= {
+        'compaction_window_unit': 'MINUTES',
+        'compaction_window_size': '3',
+        'class':'com.jeffjirsa.cassandra.db.compaction.TimeWindowCompactionStrategy'
+        };
 
 
 Source
 ------
 
-This repository ( https://github.com/jeffjirsa/twcs ) will be used for standalone TWCS code (simple jar to drop into lib/). For practical purposes, in this repository the compaction strategy is `com.jeffjirsa.cassandra.db.compaction.TimeWindowCompactionStrategy` . 
+This repository ( https://github.com/jeffjirsa/twcs ) will be used for standalone TWCS code (simple jar to drop into lib/). For practical purposes, in this repository the compaction strategy is `com.jeffjirsa.cassandra.db.compaction.TimeWindowCompactionStrategy`
 
 TWCS is also available as a C* fork (in the hopes that patches are accepted upstream): 
 
@@ -60,4 +79,3 @@ License
 -------
 
 TWCS is provided under the Apache License, V2: http://www.apache.org/licenses/LICENSE-2.0
-

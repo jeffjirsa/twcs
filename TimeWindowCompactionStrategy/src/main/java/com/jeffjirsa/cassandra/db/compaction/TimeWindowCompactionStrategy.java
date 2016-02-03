@@ -333,7 +333,7 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
     @Override
     public synchronized Collection<AbstractCompactionTask> getMaximalTask(int gcBefore, boolean splitOutput)
     {
-        LifecycleTransaction modifier = cfs.markAllCompacting(OperationType.COMPACTION);
+        LifecycleTransaction modifier = cfs.getTracker().tryModify(sstables, OperationType.COMPACTION);
         if (modifier == null)
             return null;
 

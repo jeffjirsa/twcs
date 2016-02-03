@@ -33,7 +33,6 @@ git checkout origin cassandra-2.1
 Build the jar:
 
 ```
-cd TimeWindowCompactionStrategy
 mvn compile
 mvn package
 ```

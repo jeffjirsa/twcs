@@ -1,0 +1,11 @@
+2016-02-08: Add 'enable_cleanup' option (default: false) to allow TWCS to discard data no longer owned by a node
+2016-02-08: Bring in full changes from CASSANDRA-11113
+
+2016-02-02: Project Re-org (prep for semantic versioning), no functional changes
+2016-02-02: Major compaction may mix repaired and unrepaired sstables (CASSANDRA-11113)
+2016-02-02: Update Cassandra default version: trunk tracking cassandra 3.2
+
+2015-12-08: Update Cassandra default version: trunk tracking cassandra 3.1
+
+2015-11-09: Update Cassandra default version: trunk tracking cassandra 3.0
+

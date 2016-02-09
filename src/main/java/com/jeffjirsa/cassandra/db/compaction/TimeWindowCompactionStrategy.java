@@ -82,8 +82,10 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
                 return null;
 
             LifecycleTransaction modifier = cfs.getTracker().tryModify(latestBucket, OperationType.COMPACTION);
-            if (modifier != null)
+            if (modifier != null && !options.enableCleanup)
                 return new CompactionTask(cfs, modifier, gcBefore);
+            else if(modifier != null && options.enableCleanup)
+                return new CleaningTimeWindowCompactionTask(cfs, modifier, gcBefore);
         }
     }
 

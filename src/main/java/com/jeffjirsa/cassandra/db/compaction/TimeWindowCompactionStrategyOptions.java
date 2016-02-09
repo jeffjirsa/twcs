@@ -32,16 +32,19 @@ public final class TimeWindowCompactionStrategyOptions
     protected static final TimeUnit DEFAULT_COMPACTION_WINDOW_UNIT = TimeUnit.DAYS;
     protected static final int DEFAULT_COMPACTION_WINDOW_SIZE = 1;
     protected static final int DEFAULT_EXPIRED_SSTABLE_CHECK_FREQUENCY_SECONDS = 60 * 10;
+    protected static final boolean DEFAULT_ENABLE_CLEANUP = false;
 
     protected static final String TIMESTAMP_RESOLUTION_KEY = "timestamp_resolution";
     protected static final String COMPACTION_WINDOW_UNIT_KEY = "compaction_window_unit";
     protected static final String COMPACTION_WINDOW_SIZE_KEY = "compaction_window_size";
     protected static final String EXPIRED_SSTABLE_CHECK_FREQUENCY_SECONDS_KEY = "expired_sstable_check_frequency_seconds";
+    protected static final String PERFORM_CLEANUP = "enable_cleanup";
 
     protected final int sstableWindowSize;
     protected final TimeUnit sstableWindowUnit;
     protected final TimeUnit timestampResolution;
     protected final long expiredSSTableCheckFrequency;
+    protected final boolean enableCleanup;
 
     SizeTieredCompactionStrategyOptions stcsOptions;
 
@@ -62,6 +65,9 @@ public final class TimeWindowCompactionStrategyOptions
         optionValue = options.get(EXPIRED_SSTABLE_CHECK_FREQUENCY_SECONDS_KEY);
         expiredSSTableCheckFrequency = TimeUnit.MILLISECONDS.convert(optionValue == null ? DEFAULT_EXPIRED_SSTABLE_CHECK_FREQUENCY_SECONDS : Long.parseLong(optionValue), TimeUnit.SECONDS);
 
+        optionValue = options.get(PERFORM_CLEANUP);
+        enableCleanup = Boolean.valueOf(optionValue);
+
         stcsOptions = new SizeTieredCompactionStrategyOptions(options);
     }
 
@@ -71,6 +77,8 @@ public final class TimeWindowCompactionStrategyOptions
         timestampResolution = DEFAULT_TIMESTAMP_RESOLUTION;
         sstableWindowSize = DEFAULT_COMPACTION_WINDOW_SIZE;
         expiredSSTableCheckFrequency = TimeUnit.MILLISECONDS.convert(DEFAULT_EXPIRED_SSTABLE_CHECK_FREQUENCY_SECONDS, TimeUnit.SECONDS);
+        enableCleanup = DEFAULT_ENABLE_CLEANUP;
+
         stcsOptions = new SizeTieredCompactionStrategyOptions();
     }
 
@@ -134,6 +142,7 @@ public final class TimeWindowCompactionStrategyOptions
         uncheckedOptions.remove(COMPACTION_WINDOW_UNIT_KEY);
         uncheckedOptions.remove(TIMESTAMP_RESOLUTION_KEY);
         uncheckedOptions.remove(EXPIRED_SSTABLE_CHECK_FREQUENCY_SECONDS_KEY);
+        uncheckedOptions.remove(PERFORM_CLEANUP);
 
         uncheckedOptions = SizeTieredCompactionStrategyOptions.validateOptions(options, uncheckedOptions);
 

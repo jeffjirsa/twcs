@@ -332,11 +332,13 @@ public class TimeWindowCompactionStrategy extends AbstractCompactionStrategy
     @Override
     public synchronized Collection<AbstractCompactionTask> getMaximalTask(int gcBefore, boolean splitOutput)
     {
-        LifecycleTransaction modifier = cfs.getTracker().tryModify(sstables, OperationType.COMPACTION);
-        if (modifier == null)
+        Iterable<SSTableReader> filteredSSTables = filterSuspectSSTables(sstables);
+        if (Iterables.isEmpty(filteredSSTables))
             return null;
-
-        return Arrays.<AbstractCompactionTask>asList(new CompactionTask(cfs, modifier, gcBefore, false));
+        LifecycleTransaction txn = cfs.getTracker().tryModify(filteredSSTables, OperationType.COMPACTION);
+        if (txn == null)
+            return null;
+        return Collections.<AbstractCompactionTask>singleton(new CompactionTask(cfs, txn, gcBefore, false));
     }
 
     @Override

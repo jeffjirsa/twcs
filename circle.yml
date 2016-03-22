@@ -1,0 +1,35 @@
+machine:
+  java:
+    version:
+      oraclejdk8
+
+  environment:
+    MAX_HEAP_SIZE: 512M
+    HEAP_NEWSIZE: 128M
+
+dependencies:
+  override:
+    - ./mvnw compile
+
+  cache_directories:
+
+test:
+  override:
+    - ./mvnw test
+
+deployment:
+    cassandra-2.0:
+        branch: cassandra-2.0
+        commands:
+            - ./mvnw package
+            - ./mvnw -s conf/settings.xml deploy
+    cassandra-2.1:
+        branch: cassandra-2.1
+        commands:
+            - ./mvnw package
+            - ./mvnw -s conf/settings.xml deploy
+    cassandra-2.2:
+        branch: cassandra-2.2
+        commands:
+            - ./mvnw package
+            - ./mvnw -s conf/settings.xml deploy

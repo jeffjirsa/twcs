@@ -24,4 +24,10 @@
       <version>3.7</version>
     </dependency>
   </dependencies>
+	<distributionManagement>
+	<repository>
+		<id>bintray-repo-twcs</id>
+		<url>https://api.bintray.com/maven/${env.BINTRAY_URL};publish=0</url>
+	</repository>
+	</distributionManagement>
 </project>
